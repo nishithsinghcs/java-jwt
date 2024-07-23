@@ -1,0 +1,83 @@
+The error you're encountering indicates that the certificate in question does not have the required Extended Key Usage (EKU) for SSL server authentication. For a certificate to be used as an SSL/TLS server certificate, it must include the Server Authentication EKU (`OID 1.3.6.1.5.5.7.3.1`).
+
+### Steps to Resolve the Issue
+
+1. **Check the Certificate’s Extended Key Usage (EKU)**:
+   You can inspect the EKUs of the certificate to verify if it includes Server Authentication. Here's how to do it programmatically using .NET:
+
+   ```csharp
+   using System;
+   using System.Security.Cryptography.X509Certificates;
+
+   public class Program
+   {
+       public static void Main()
+       {
+           // Load the certificate
+           X509Certificate2 cert = new X509Certificate2("path_to_certificate.pfx", "password");
+           
+           // Check if the certificate has Server Authentication EKU
+           bool hasServerAuthEku = false;
+           foreach (X509EnhancedKeyUsageExtension eku in cert.Extensions.OfType<X509EnhancedKeyUsageExtension>())
+           {
+               foreach (Oid oid in eku.EnhancedKeyUsages)
+               {
+                   if (oid.Value == "1.3.6.1.5.5.7.3.1") // OID for Server Authentication
+                   {
+                       hasServerAuthEku = true;
+                       break;
+                   }
+               }
+           }
+           
+           if (hasServerAuthEku)
+           {
+               Console.WriteLine("The certificate includes Server Authentication EKU.");
+           }
+           else
+           {
+               Console.WriteLine("The certificate does not include Server Authentication EKU.");
+           }
+       }
+   }
+   ```
+
+2. **Reissue the Certificate**:
+   If the certificate does not include the Server Authentication EKU, you'll need to reissue or obtain a new certificate that has this EKU. This involves:
+
+   - **Generating a Certificate Signing Request (CSR)**: When generating the CSR, ensure that the request includes Server Authentication as one of the EKUs.
+   
+   - **Requesting the Certificate from a Certificate Authority (CA)**: Submit the CSR to your CA and ensure that the certificate issued has the Server Authentication EKU.
+
+   - **Installing the New Certificate**: Once you receive the new certificate from the CA, install it on your server.
+
+3. **Modify the Certificate (if applicable)**:
+   In some cases, if you have control over the certificate issuance process and are using a CA that supports custom EKU settings, you may be able to request an updated certificate with the required EKU.
+
+### Example of Certificate Request with EKUs
+
+When creating a CSR, specify the EKUs in your request configuration. Here’s an example of how you might specify this using OpenSSL:
+
+```sh
+openssl req -new -key your_key.key -out your_csr.csr -config <(echo "[req]
+default_bits = 2048
+default_keyfile = your_key.key
+distinguished_name = dn
+[dn]
+countryName = Country Name (2 letter code)
+stateOrProvinceName = State or Province Name (full name)
+localityName = Locality Name (eg, city)
+organizationName = Organization Name (eg, company)
+organizationalUnitName = Organizational Unit Name (eg, section)
+commonName = Common Name (e.g. server FQDN or YOUR name)
+emailAddress = Email Address
+[ext]
+extendedKeyUsage = serverAuth
+")
+```
+
+Ensure that your CA is aware of your needs and that your CSR specifies the required EKUs.
+
+### Summary
+
+To use a certificate for SSL/TLS server authentication, it must include the Server Authentication EKU. If your current certificate lacks this EKU, you will need to obtain a new certificate that includes it by generating a proper CSR and submitting it to a CA.
